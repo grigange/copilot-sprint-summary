@@ -18,6 +18,8 @@
   <img src="https://img.shields.io/badge/Requires-GitHub%20Copilot-8957e5?style=flat-square&logo=github" alt="Requires GitHub Copilot">
 </p>
 
+![Demo](images/showcase.gif)
+
 ---
 
 ## ⚡ What is this?
@@ -167,4 +169,3 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 <p align="center">
   <strong>Made by <a href="https://github.com/grigange">Angelos Grigoriou</a></strong>
 </p>
-# copilot-sprint-summary
