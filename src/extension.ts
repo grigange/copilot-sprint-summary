@@ -164,9 +164,13 @@ export function activate(context: vscode.ExtensionContext) {
 
       if (selected) {
         const newModel = selected.label === '$(sparkle) Use Default' ? '' : selected.label;
-        await config.update('aiModel', newModel, vscode.ConfigurationTarget.Global);
-        // Force settings UI refresh by closing and reopening
-        await vscode.commands.executeCommand('workbench.action.openSettings', 'sprintSummary.aiModel');
+        
+        // Always save to workspace settings
+        const hasWorkspace = vscode.workspace.workspaceFolders && vscode.workspace.workspaceFolders.length > 0;
+        const target = hasWorkspace ? vscode.ConfigurationTarget.Workspace : vscode.ConfigurationTarget.Global;
+        
+        await config.update('aiModel', newModel, target);
+        vscode.window.showInformationMessage(`AI model saved to ${hasWorkspace ? 'workspace' : 'user'} settings`);
       }
     } catch (error) {
       vscode.window.showErrorMessage(`Error selecting AI model: ${error}`);
@@ -191,9 +195,13 @@ export function activate(context: vscode.ExtensionContext) {
 
       if (folderUri && folderUri[0]) {
         const selectedPath = folderUri[0].fsPath;
-        await config.update('outputFolder', selectedPath, vscode.ConfigurationTarget.Global);
-        // Force settings UI refresh by closing and reopening
-        await vscode.commands.executeCommand('workbench.action.openSettings', 'sprintSummary.outputFolder');
+        
+        // Always save to workspace settings
+        const hasWorkspace = vscode.workspace.workspaceFolders && vscode.workspace.workspaceFolders.length > 0;
+        const target = hasWorkspace ? vscode.ConfigurationTarget.Workspace : vscode.ConfigurationTarget.Global;
+        
+        await config.update('outputFolder', selectedPath, target);
+        vscode.window.showInformationMessage(`Output folder saved to ${hasWorkspace ? 'workspace' : 'user'} settings: ${selectedPath}`);
       }
     } catch (error) {
       vscode.window.showErrorMessage(`Error setting output folder: ${error}`);
@@ -273,15 +281,19 @@ export function activate(context: vscode.ExtensionContext) {
       const config = vscode.workspace.getConfiguration('sprintSummary');
       const outputFolder = config.get<string>('outputFolder') || require('path').join(require('os').homedir(), 'Documents', 'Sprint Summaries');
       const dateFormat = config.get<string>('dateFormat') || 'DD-MM-YYYY';
-      const fileNamePattern = config.get<string>('fileNamePattern') || '{date}';
+      const fileNamePattern = config.get<string>('fileNamePattern') || '{project}_Sprint_{date}';
 
       // Save to file using configured settings
       const path = require('path');
       const now = new Date();
       const formattedDate = formatDate(now, dateFormat);
+      
+      // Get project name from workspace folder
+      const projectName = workspaceFolder.name || 'project';
 
       // Replace placeholders in file name pattern
       let fileName = fileNamePattern
+        .replace('{project}', projectName)
         .replace('{date}', formattedDate)
         .replace('{author}', selectedAuthor === 'All Authors' ? 'all' : selectedAuthor)
         .replace('{days}', String(daysAgo));

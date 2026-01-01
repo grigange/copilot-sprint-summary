@@ -1,6 +1,6 @@
 {
   "name": "copilot-sprint-summary",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "AI-powered sprint summaries from your git history. Automatically analyze commits and generate professional reports using GitHub Copilot.",
   "license": "MIT",
   "author": "Angelos Grigoriou",
@@ -112,13 +112,15 @@
             "2025_12_18 (Underscore separated)",
             "18.12.2025 (Dot separated)"
           ],
+          "scope": "resource",
           "order": 1
         },
         "sprintSummary.fileNamePattern": {
           "type": "string",
-          "default": "Sprint_{date}",
-          "description": "Template pattern for generated file names. Use placeholders: {date}, {author}, {days}.",
-          "markdownDescription": "**File name template** for generated sprint summaries.\n\nCustomize the naming pattern to match your team's organization system.\n\n**Available placeholders:**\n- `{date}` — Formatted date (uses Date Format setting)\n- `{author}` — Git author name or 'all' for all authors\n- `{days}` — Number of days covered in the summary\n\n**Examples:**\n- `Sprint_{date}` → `Sprint_2025-12-18.md`\n- `{author}_{date}` → `john_2025-12-18.md`\n- `Summary_{days}days_{date}` → `Summary_14days_2025-12-18.md`",
+          "default": "{project}_Sprint_{date}",
+          "description": "Template pattern for generated file names. Use placeholders: {project}, {date}, {author}, {days}.",
+          "markdownDescription": "**File name template** for generated sprint summaries.\n\nCustomize the naming pattern to match your team's organization system.\n\n**Available placeholders:**\n- `{project}` — Workspace/project folder name\n- `{date}` — Formatted date (uses Date Format setting)\n- `{author}` — Git author name or 'all' for all authors\n- `{days}` — Number of days covered in the summary\n\n**Examples:**\n- `{project}_Sprint_{date}` → `my-app_Sprint_2025-12-18.md`\n- `{author}_{date}` → `john_2025-12-18.md`\n- `{project}_{days}days_{date}` → `my-app_14days_2025-12-18.md`",
+          "scope": "resource",
           "order": 2
         },
         "sprintSummary.customOpenCommand": {
@@ -126,6 +128,7 @@
           "default": "",
           "description": "Custom command or URI to open generated files. Leave empty to open in VS Code.",
           "markdownDescription": "**Custom command or URI** to open generated files in external applications.\n\nLeave empty to open files directly in VS Code.\n\n**Available placeholders:**\n- `{filePath}` — Full path to the generated file\n- `{fileName}` — File name only (e.g., `Sprint_2025-12-18.md`)\n- `{folderName}` — Parent folder name only\n\n**URI Examples:**\n\n*Obsidian:*`obsidian://open?vault=MyVault&file={folderName}/{fileName}`",
+          "scope": "resource",
           "order": 3
         },
         "sprintSummary.aiModel": {
@@ -133,6 +136,7 @@
           "default": "",
           "description": "AI model family to use for generating summaries. Leave empty to use the default Copilot model.",
           "markdownDescription": "**AI model family** to use for generating sprint summaries.\n\nLeave empty to automatically use the best available Copilot model.\n\n💡 **Quick setup:** [Browse and select a model](command:mcp.selectAiModel)",
+          "scope": "resource",
           "order": 4
         },
         "sprintSummary.systemPrompt": {
@@ -141,6 +145,7 @@
           "description": "Instructions that guide the AI on how to structure and format sprint summaries.",
           "markdownDescription": "**System prompt** that instructs the AI on how to analyze commits and structure sprint summaries.\n\nCustomize this prompt to match your team's workflow, terminology, and reporting requirements.\n\n**Default structure:**\n- Groups commits by functional area and type\n- Creates executive-friendly overviews\n- Includes metrics and key highlights\n\n💡 **Tip:** Modify the grouping categories, format style, or add specific requirements for your team's needs (e.g., JIRA ticket format, stakeholder language, technical depth).",
           "editPresentation": "multilineText",
+          "scope": "resource",
           "order": 5
         }
       }
