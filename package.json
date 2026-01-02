@@ -4,6 +4,12 @@
   "description": "AI-powered sprint summaries from your git history. Automatically analyze commits and generate professional reports using GitHub Copilot.",
   "license": "MIT",
   "author": "Angelos Grigoriou",
+  "contributors": [
+    {
+      "name": "Andrew Sidhu",
+      "url": "https://github.com/SippieCup"
+    }
+  ],
   "type": "commonjs",
   "main": "./dist/extension.js",
   "icon": "images/logo_ext.png",
@@ -46,8 +52,10 @@
   "scripts": {
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",
+    "compile:test": "tsc -p tsconfig.test.json",
+    "vsix": "npm exec --yes --package @vscode/vsce -- vsce package",
     "watch": "tsc -watch -p ./",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "npm run compile && npm run compile:test && node --test dist-test/test/git-range.test.js"
   },
   "devDependencies": {
     "@types/node": "^20.x",

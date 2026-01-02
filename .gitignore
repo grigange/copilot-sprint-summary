@@ -1,5 +1,6 @@
 # Compiled output
 dist/
+dist-test/
 out/
 *.vsix
 
