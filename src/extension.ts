@@ -1,4 +1,59 @@
 import * as vscode from 'vscode';
+import {
+  MAX_LOG_ENTRIES,
+  RangeSelection,
+  RangeType,
+  getCommitDate,
+  getCommitsForSelection
+} from './gitRange';
+
+interface TagInfo {
+  name: string;
+  commitHash: string;
+  date: Date;
+}
+
+function shortHash(hash?: string): string {
+  return hash ? hash.slice(0, 7) : '';
+}
+
+function calculateDaysSpan(sinceDate: Date): number {
+  const msInDay = 24 * 60 * 60 * 1000;
+  const diffMs = Date.now() - sinceDate.getTime();
+  return Math.max(1, Math.ceil(diffMs / msInDay));
+}
+
+async function getTagsByRecency(repo: any): Promise<TagInfo[]> {
+  if (!repo.getRefs) {
+    return [];
+  }
+
+  const refs = await repo.getRefs({ type: 2 });
+  const tags = await Promise.all(
+    refs.map(async (ref: any) => {
+      const name = ref.name || ref.ref || ref.label || '';
+      const commitRef = ref.commit || ref.hash || ref.objectId || name;
+      try {
+        const commit = await repo.getCommit(commitRef);
+        return {
+          name,
+          commitHash: commit.hash || commitRef,
+          date: getCommitDate(commit)
+        };
+      } catch (error) {
+        return {
+          name,
+          commitHash: commitRef,
+          date: new Date(0)
+        };
+      }
+    })
+  );
+
+  return tags
+    .filter(tag => tag.name)
+    .sort((a, b) => b.date.getTime() - a.date.getTime());
+}
 
 function formatDate(date: Date, format: string): string {
   const day = String(date.getDate()).padStart(2, '0');
@@ -21,42 +76,13 @@ function formatDate(date: Date, format: string): string {
   }
 }
 
-async function generateSprintSummary(days: number, authorFilter?: string): Promise<string> {
-  const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
-  if (!workspaceFolder) {
-    throw new Error('No workspace folder open');
-  }
-
-  const gitExtension = vscode.extensions.getExtension('vscode.git')?.exports;
-  const git = gitExtension?.getAPI(1);
-  if (!git) {
-    throw new Error('Git extension not available');
-  }
-
-  const repo = git.repositories[0];
-  if (!repo) {
-    throw new Error('No git repository found');
-  }
-
-  const sinceDate = new Date();
-  sinceDate.setDate(sinceDate.getDate() - days);
-
-  const allCommits = await repo.log({ maxEntries: 500 });
-  const recentAllCommits = allCommits.filter((commit: any) =>
-    new Date(commit.authorDate || 0) >= sinceDate
-  );
-
-  let recentCommits = recentAllCommits;
-  if (authorFilter && authorFilter !== 'All Authors') {
-    recentCommits = recentAllCommits.filter((commit: any) => commit.authorName === authorFilter);
-  }
-
-  if (recentCommits.length === 0) {
+async function generateSprintSummary(repo: any, commits: any[]): Promise<string> {
+  if (commits.length === 0) {
     throw new Error('No commits found for the selected criteria');
   }
 
   const commitDetails = await Promise.all(
-    recentCommits.slice(0, 50).map(async (commit: any) => {
+    commits.map(async (commit: any) => {
       try {
         const changes = commit.hash ? await repo.diffBetween(commit.parents[0], commit.hash) : [];
         const filesChanged = changes.map((change: any) => {
@@ -75,7 +101,7 @@ async function generateSprintSummary(days: number, authorFilter?: string): Promi
     })
   );
 
-  const commits = commitDetails.join('\n\n');
+  const commitsText = commitDetails.join('\n\n');
 
   // Get AI model and system prompt from configuration
   const config = vscode.workspace.getConfiguration('sprintSummary');
@@ -100,7 +126,7 @@ async function generateSprintSummary(days: number, authorFilter?: string): Promi
   const model = models[0];
 
   const messages = [
-    vscode.LanguageModelChatMessage.User(`${systemPrompt}\n\nCommits to summarize:\n${commits}`)
+    vscode.LanguageModelChatMessage.User(`${systemPrompt}\n\nCommits to summarize:\n${commitsText}`)
   ];
 
   const response = await model.sendRequest(messages, {}, new vscode.CancellationTokenSource().token);
@@ -164,11 +190,11 @@ export function activate(context: vscode.ExtensionContext) {
 
       if (selected) {
         const newModel = selected.label === '$(sparkle) Use Default' ? '' : selected.label;
-        
+
         // Always save to workspace settings
         const hasWorkspace = vscode.workspace.workspaceFolders && vscode.workspace.workspaceFolders.length > 0;
         const target = hasWorkspace ? vscode.ConfigurationTarget.Workspace : vscode.ConfigurationTarget.Global;
-        
+
         await config.update('aiModel', newModel, target);
         vscode.window.showInformationMessage(`AI model saved to ${hasWorkspace ? 'workspace' : 'user'} settings`);
       }
@@ -195,11 +221,11 @@ export function activate(context: vscode.ExtensionContext) {
 
       if (folderUri && folderUri[0]) {
         const selectedPath = folderUri[0].fsPath;
-        
+
         // Always save to workspace settings
         const hasWorkspace = vscode.workspace.workspaceFolders && vscode.workspace.workspaceFolders.length > 0;
         const target = hasWorkspace ? vscode.ConfigurationTarget.Workspace : vscode.ConfigurationTarget.Global;
-        
+
         await config.update('outputFolder', selectedPath, target);
         vscode.window.showInformationMessage(`Output folder saved to ${hasWorkspace ? 'workspace' : 'user'} settings: ${selectedPath}`);
       }
@@ -228,34 +254,142 @@ export function activate(context: vscode.ExtensionContext) {
         throw new Error('No git repository found');
       }
 
-      // Ask for number of days
-      const daysInput = await vscode.window.showInputBox({
-        prompt: 'Number of days to include in summary',
-        value: '14',
-        validateInput: (value) => {
-          const num = parseInt(value);
-          return isNaN(num) || num <= 0 ? 'Please enter a valid positive number' : null;
-        }
-      });
-
-      if (!daysInput) {
-        return; // User cancelled
+      interface RangeOption extends vscode.QuickPickItem {
+        rangeType: RangeType;
       }
 
-      const daysAgo = parseInt(daysInput);
-      const sinceDate = new Date();
-      sinceDate.setDate(sinceDate.getDate() - daysAgo);
+      const rangeOptions: RangeOption[] = [
+        {
+          label: 'Date (last N days)',
+          description: 'Use a number of days as the cutoff',
+          rangeType: 'days'
+        },
+        {
+          label: 'Git Tag',
+          description: 'Select a tag to compare against (merge target)',
+          rangeType: 'tag'
+        },
+        {
+          label: 'Commit',
+          description: 'Select a commit to compare against (merge target)',
+          rangeType: 'commit'
+        }
+      ];
 
-      // Get all unique authors from recent commits
-      const allCommits = await repo.log({ maxEntries: 500 });
-      const recentAllCommits = allCommits.filter((commit: any) =>
-        new Date(commit.authorDate || 0) >= sinceDate
-      );
+      const rangeChoice = await vscode.window.showQuickPick(rangeOptions, {
+        placeHolder: 'Choose how far back the summary should go',
+        canPickMany: false
+      });
 
-      const uniqueAuthors = [...new Set(recentAllCommits.map((c: any) => c.authorName))].sort();
+      if (!rangeChoice) {
+        return;
+      }
+
+      let selection: RangeSelection;
+
+      if (rangeChoice.rangeType === 'days') {
+        // Ask for number of days
+        const daysInput = await vscode.window.showInputBox({
+          prompt: 'Number of days to include in summary',
+          value: '14',
+          validateInput: (value) => {
+            const num = parseInt(value);
+            return isNaN(num) || num <= 0 ? 'Please enter a valid positive number' : null;
+          }
+        });
+
+        if (!daysInput) {
+          return; // User cancelled
+        }
+
+        const daysAgo = parseInt(daysInput);
+        const sinceDate = new Date();
+        sinceDate.setDate(sinceDate.getDate() - daysAgo);
+        selection = { type: 'days', days: daysAgo, sinceDate };
+      } else if (rangeChoice.rangeType === 'tag') {
+        interface TagPickItem extends vscode.QuickPickItem {
+          tag: TagInfo;
+        }
+
+        const tags = await getTagsByRecency(repo);
+        if (tags.length === 0) {
+          throw new Error('No git tags found in this repository');
+        }
+
+        const tagItems: TagPickItem[] = tags.map(tag => ({
+          label: tag.name,
+          description: tag.date.toLocaleDateString(),
+          detail: shortHash(tag.commitHash),
+          tag
+        }));
+
+        const selectedTag = await vscode.window.showQuickPick(tagItems, {
+          placeHolder: 'Select a tag to compare against (merge target)',
+          canPickMany: false
+        });
+
+        if (!selectedTag) {
+          return;
+        }
+
+        selection = {
+          type: 'tag',
+          tag: selectedTag.tag.name,
+          commitHash: selectedTag.tag.commitHash,
+          sinceDate: selectedTag.tag.date
+        };
+      } else {
+        interface CommitPickItem extends vscode.QuickPickItem {
+          commit: any;
+        }
+
+        const allCommits = await repo.log({ maxEntries: MAX_LOG_ENTRIES });
+        if (allCommits.length === 0) {
+          throw new Error('No commits found on the current branch');
+        }
+
+        const commitItems: CommitPickItem[] = allCommits.map((commit: any) => {
+          const date = getCommitDate(commit).toLocaleDateString();
+          const hash = shortHash(commit.hash);
+          const author = commit.authorName || 'Unknown';
+          const label = commit.message ? commit.message.split('\n')[0] : (hash || 'Commit');
+          const description = [hash, author, date].filter(Boolean).join(' | ');
+
+          return {
+            label,
+            description,
+            commit
+          };
+        });
+
+        const selectedCommit = await vscode.window.showQuickPick(commitItems, {
+          placeHolder: 'Select a commit to compare against (merge target)',
+          canPickMany: false,
+          matchOnDescription: true
+        });
+
+        if (!selectedCommit) {
+          return;
+        }
+
+        selection = {
+          type: 'commit',
+          commitHash: selectedCommit.commit.hash,
+          sinceDate: getCommitDate(selectedCommit.commit)
+        };
+      }
+
+      const commitsInRange = await getCommitsForSelection(repo, selection);
+      if (commitsInRange.length === 0) {
+        throw new Error('No commits found for the selected range');
+      }
+
+      const uniqueAuthors = [...new Set(commitsInRange.map((c: any) => c.authorName))]
+        .filter(Boolean)
+        .sort();
 
       if (uniqueAuthors.length === 0) {
-        throw new Error(`No commits found in the last ${daysAgo} days`);
+        throw new Error('No commits found for the selected range');
       }
 
       // Ask user to select author
@@ -274,8 +408,16 @@ export function activate(context: vscode.ExtensionContext) {
 
       vscode.window.showInformationMessage('Generating sprint summary...');
 
+      const commitsForSummary = selectedAuthor === 'All Authors'
+        ? commitsInRange
+        : commitsInRange.filter((commit: any) => commit.authorName === selectedAuthor);
+
+      if (commitsForSummary.length === 0) {
+        throw new Error('No commits found for the selected author');
+      }
+
       // Generate the summary
-      const summary = await generateSprintSummary(daysAgo, selectedAuthor);
+      const summary = await generateSprintSummary(repo, commitsForSummary);
 
       // Get configuration settings
       const config = vscode.workspace.getConfiguration('sprintSummary');
@@ -287,7 +429,8 @@ export function activate(context: vscode.ExtensionContext) {
       const path = require('path');
       const now = new Date();
       const formattedDate = formatDate(now, dateFormat);
-      
+      const daysAgo = selection.type === 'days' ? selection.days : calculateDaysSpan(selection.sinceDate);
+
       // Get project name from workspace folder
       const projectName = workspaceFolder.name || 'project';
 
