@@ -2,7 +2,6 @@
   "packages": {
     ".": {
       "release-type": "node",
-      "package-name": "copilot-sprint-summary",
       "changelog-sections": [
         { "type": "feat", "section": "Features", "hidden": false },
         { "type": "fix", "section": "Bug Fixes", "hidden": false },
