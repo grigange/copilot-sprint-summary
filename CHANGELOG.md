@@ -5,6 +5,17 @@ All notable changes to Sprint Summary for Copilot will be documented in this fil
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0](https://github.com/grigange/copilot-sprint-summary/compare/copilot-sprint-summary-v0.2.0...copilot-sprint-summary-v1.0.0) (2026-01-11)
+
+
+### ⚠ BREAKING CHANGES
+
+* change please workflow to vsce handling
+
+### Bug Fixes
+
+* change please workflow to vsce handling ([02ac00b](https://github.com/grigange/copilot-sprint-summary/commit/02ac00b0562c41ff8047e76c00684e19af260ef6))
+
 ## [0.2.0](https://github.com/grigange/copilot-sprint-summary/compare/copilot-sprint-summary-v0.1.1...copilot-sprint-summary-v0.2.0) (2026-01-11)
 
 
