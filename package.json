@@ -1,6 +1,6 @@
 {
   "name": "copilot-sprint-summary",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "AI-powered sprint summaries from your git history. Automatically analyze commits and generate professional reports using GitHub Copilot.",
   "license": "MIT",
   "author": "Angelos Grigoriou",
