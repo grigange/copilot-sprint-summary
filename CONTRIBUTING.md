@@ -40,6 +40,35 @@ npm run compile
 6. Push to your fork (`git push origin feature/amazing-feature`)
 7. Open a Pull Request
 
+#### Commit Message Format
+We use [Conventional Commits](https://www.conventionalcommits.org/) for automated changelog generation and versioning:
+
+```
+<type>: <description>
+
+[optional body]
+
+[optional footer(s)]
+```
+
+**Types:**
+- `feat:` New features (triggers minor version bump)
+- `fix:` Bug fixes (triggers patch version bump)
+- `docs:` Documentation changes
+- `refactor:` Code refactoring
+- `perf:` Performance improvements
+- `test:` Adding or updating tests
+- `chore:` Maintenance tasks
+- `ci:` CI/CD changes
+- `BREAKING CHANGE:` in footer triggers major version bump
+
+**Examples:**
+```bash
+feat: add multi-repository support
+fix: resolve date format parsing issue
+docs: update README with new configuration options
+```
+
 #### Code Style
 - Use TypeScript strict mode
 - Follow existing code patterns
